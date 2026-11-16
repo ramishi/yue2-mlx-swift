@@ -140,7 +140,7 @@ let (render, transfer) = try Instrumental.renderRequest(from: request, plannedAB
 // render: Vocal notes moved to Ins, section tags as lyrics, "no vocals…" style, negativeStyle + cfg 1.5
 ```
 
-`SongRequest.negativeStyle` (EXPERIMENTAL) conditions the negative CFG branch on tags (`[EOD] + instruction + [Tags] negativeStyle [Lyrics]`); it acts only when `guidance` ≠ 1. A render can still hum the verse (2 seeds in 8): check it (SheetSage2 track-0 notes, `yue2 generate --instrumental` re-rolls the seed).
+`SongRequest.negativeStyle` (EXPERIMENTAL) conditions the negative CFG branch on tags (`[EOD] + instruction + [Tags] negativeStyle [Lyrics]`); it acts only when `guidance` ≠ 1. A render can still hum the verse (2 seeds in 8): check it (SheetSage2 track-0 notes, `yue2 generate --instrumental` re-rolls the seed). On 3–4 minute songs a single 10–30 s hum can exceed the whole-track threshold and trigger a full re-render; the recipe doubles AR time and is not a vocal-free guarantee. See [App and UI integration](#app-and-ui-integration-measured-constraints) before exposing it in a UI.
 
 ## Transcription: `SheetSage2Core` (recording → ABC)
 
@@ -217,11 +217,119 @@ public struct YuE2ReferenceProfile { id, bits, kind, quant, quantizeHead, precis
     static let all: [YuE2ReferenceProfile]; static func named(_:) -> YuE2ReferenceProfile?; func applyGlobalPolicy() }
 ```
 
-See [References.md](References.md) for the six and their measurements.
+See [References.md](References.md) for the seven profiles and their measurements (`4bit-tiny` is the seventh; `generate --help` still says "six"). Before putting a profile picker in a UI, read [App and UI integration](#app-and-ui-integration-measured-constraints): these are memory/speed presets over the same weights, not quality tiers.
 
 ## Quantization
 
 `YuE2Quantization`: `.none`, `.qint8`, `.int4` (AR path), `.qint8All`, `.int4All`, `.int4Mixed` (4-bit AR path, 8-bit NAR, 4-bit embeddings); `quantizeHead` adds `lm_head`. `LMWeightLoader.load` quantizes on the fly then exports `mlx-prequantized/<preset>[-head]/`; later loads read the export. Parities: AR int4 greedy 8/8, NAR 8-bit rel 0.049 over 32 steps (a 4-bit NAR fails: 0.15).
+
+## App and UI integration: measured constraints
+
+Read this before designing a generation UI. Everything here was measured on the
+`fix/non-finite-wav-export` fork (M5 / 32 GB, macOS 27.2.1, 2026-11-15/16): a 12 s smoke test,
+a 4.58-minute song, a 3.33-minute fixed-score instrumental cover and a 3-seed x 2-profile
+control. Full tables live in `.local-runs/instrumental-longsong-20261116/`,
+`.local-runs/instrumental-seeds-20261116/`, `.local-runs/tiny-eval-20261115/` and
+`.local-runs/cover-eval-20261115/` (gitignored, machine-local) and are summarised in
+`docs/knowledge/log.md`. Each rule below is a control a UI might be tempted to expose.
+
+### 1. A profile picker is a memory/speed control, not a quality ladder
+
+All seven reference profiles load the **same `YuE2-3B` weights**; `--instrumental` is orthogonal
+to `--reference` (no per-profile branch in `GenerateCommand`). Do not label the picker
+"low / medium / high quality", do not rank profiles by audio quality, and do not build a
+"better instrumental model" toggle: this engine has no LoRA/adapter loading (the separate
+`YuE2-Studio` project uses a community `yue2-instrumental` LoRA that is not portable here).
+`4bit-tiny` is byte-identical to `4bit-lean` in every artifact, i.e. only VAE tile 64 / 256 MB
+cache / 3072 MB GC threshold differ. On a 32 GB Mac the default is **`4bit-fast`**:
+cooled 70 s bench 67.8 s / 8166 MB vs tiny 82.3 s / 2471 MB (+21 %; +10 % drift-adjusted),
+120 s cover +10–20 %; 200 s instrumental 354–474 s / 10.63 GB vs 525–641 s / 5.02–5.07 GB
+(**1.35–1.48x slower** on tiny). Tiny's long-song peak (~5 GB) is also above its own 3072 MB
+threshold, so it no longer fits the ~3 GB device it was designed for. Enumerate profiles from
+`yue2 references` at runtime: `generate --help` still says "six" and omits `4bit-tiny`, while
+there are seven.
+
+### 2. "Instrumental" is a workflow, and it is not a guarantee
+
+`--instrumental` = move `Vocal` notes to `Ins` (871 on the 143-bar test score), replace lyrics with
+section tags, append "no vocals, no singing…" to the style, add a negative voice-tag CFG branch
+(`cfg_scale` 1.5) and check the render with SheetSage2. The official upstream skill states
+`absence_of_vocals_checked=False`; a file check is not proof. Historically 6/8 first seeds were
+clean (~25 % leak per seed, ~2 % after two retries); a leak hums **one verse for 10–30 s**, not
+the whole song. UI copy must say "voice check: N sung notes (proxy)" rather than "vocal-free",
+always offer listening, and expose an explicit re-roll. There is no local Demucs / AST
+vocal-energy measurement to turn into a percentage.
+
+### 3. Do not gate a long song on a whole-track sung-note count
+
+`GenerateCommand.voiceNoteTolerance = 4` is an **absolute count over the entire track**, and a
+retry re-renders the **whole song** with `seed + 1` (no re-plan; the imposed ABC is kept). On a
+3.33-minute cover, one 12 s hum at 120–132 s produced exactly 12 track-0 notes and would
+trigger up to three renders (~6 min each on `4bit-fast`, ~9–11 min on `4bit-tiny`). The longer
+the song, the more likely one local hum is. Prefer a per-minute / 30 s window check, or
+`--instrumental-retries 0` followed by an independent `yue2 transcribe --profile 16bit-fast`
+on the saved WAV (~14 s) and a user-visible "re-roll with seed N+1" action. If you keep automatic
+retries, show the seed, the attempt number, the estimated cost and a cancel button.
+
+### 4. Never infer profile superiority from one render
+
+Seed-matched, fixed-score control: `4bit-fast` 12 / 0 / 0 sung notes and `4bit-tiny` 0 / 0 / 0
+over seeds 12300–12302 (one-sided Fisher exact p = 0.5; under a 25 % leak rate,
+`P(0/3) = 0.42`). Both are compatible with the same leak rate; resolving a difference needs
+20+ seeds per profile. The 12-note leak disappeared on the very first retry seed, which is
+exactly what `--instrumental-retries 2` does. Do not use a single clean render to change the
+default profile or to write "profile X is better at instrumental" into the UI.
+
+### 5. Budget the negative CFG branch, especially on small-device presets
+
+CFG 1.5 doubles the AR work: semantic 82.6 -> 132.7 s (+61 %) and peak process 9387 ->
+10632 MB (+13 %) on `4bit-fast`; on `4bit-tiny` a 12 s instrumental went 2405 -> 3265 MB
+(+36 %) and a 200 s one to ~5.0 GB. Most of that is CFG, not the voice check (retries 0 vs 1
+differ by 7 MB). A hard ~2.5–3 GB device should not silently get the full recipe:
+`--cfg-scale 1 --instrumental-retries 0` is the memory-safe combination, but it is unverified
+for leak rate — surface it as an explicit "low memory" option with that caveat.
+
+### 6. Comparing profiles fairly requires the cover method, and still cannot rank quality
+
+Same profile + seed + fixed score -> bit-identical `semantic.npy`, `latent.npy`, `audio.wav`.
+Different quantisation diverges within the first ~17 semantic tokens even with score, lyrics,
+style, seed and length locked: it is a **different rendition**, not a degraded copy. So an A/B
+feature must use `yue2 transcribe` -> one fixed `--abc-file` -> `cot melody`, and must not show a
+quality score. `adherence.py` numbers (fast 100/98 % vs lean/tiny 70/68 %) are a beat-grid
+artifact: a single global offset cannot follow SheetSage2 drift, refitting per 20 s gives lean
+`98/100/100/80/91/96 %` on one seed, and `alignmentCost` barely moves (0.3 % apart on another
+seed despite 100 % vs 57 % adherence). Do not display "adherence %".
+
+### 7. Length, ETA and progress
+
+A 4.58-minute song rendered in 274.9 s with steady RMS across 28 segments; a 3.33-minute
+instrumental cover was clean on both profiles with 0 non-finite / 0 clipped samples and no
+long silence. VAE scales linearly, NAR dominates and is superlinear; the planner does not grow
+with the lyrics. Score planning and the `Vocal`→`Ins` transfer run in the CLI **before**
+`pipeline.generate`, so the e2e number in `result.json` excludes them (with `--abc-file` the
+planner is skipped entirely); do not use it as a speed comparison. Wall time drifts with
+GPU thermals: the same batch saw `4bit-fast` 354 -> 474 s and `4bit-tiny` 525 -> 641 s. Compute
+ETA from live phase events (`.stage`, `.semanticToken`, `.narProgress`, `.vaeProgress`), never
+from one hardcoded constant.
+
+### 8. Artifacts and failure states the UI must not misread
+
+`AudioExporter` (the single write path for all 7 call sites / 6 CLI commands) replaces
+non-finite samples with silence; finite samples are bit-identical, and `status: complete` in
+`result.json` is unchanged. `audio.wav` is written **before** `semantic.npy` / `latent.npy` /
+`result.json`, so a crash used to leave a partial directory: treat a missing `result.json` as
+incomplete even if a WAV exists. A forced `--semantic-max-tokens` sets
+`truncated.semantic: true` — that is an intentional cap, not an error. VAE tile size is **not**
+a quality knob: tiles 64 / 640 / 1024 produce SHA-identical float32 audio, and the fp16
+shape-safe guard halves the tile and re-decodes only when a crop is non-finite (1024 -> 512).
+Do not expose a tile-size slider.
+
+### 9. Provenance of these fixes (as of 2026-11-16)
+
+The WAV sanitizer, the shape-independent VAE retry guard and the `4bit-fast` 640-frame default
+live on the local fork branch `fix/non-finite-wav-export` (`f5961787`), with PR #6 open
+upstream; the fork's default `main` does **not** contain them. If the UI depends on these
+guarantees, pin that branch or commit rather than `main`.
 
 ## Tests
 

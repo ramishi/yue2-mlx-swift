@@ -197,6 +197,20 @@ yue2 karaoke --song run/ --sheetsage           # score on a SheetSage2 beat grid
 
 The upstream recipe (m-a-p `skills/yue2-music/instrumental`): plan a score (section tags as lyrics when none are given), move every `Vocal` note to `Ins` (the `Vocal` voice keeps rests and chord symbols; on a bar where both voices play, the voice wins), render that imposed score with section tags as lyrics and a style ending in "no vocals…". On top of it: a negative CFG branch conditioned on voice tags (`cfg_scale` 1.5) and a voice check of the render (SheetSage2 sung-note count, re-render on the next seed above 4 notes). Without the transfer the model sings whatever the style says; with everything, 6 renders in 8 had no voice on the first seed (a leak, when there is one, hums the verse). Writes `planned.abc` (the score before the transfer) and `instrumental.json` (moved notes, checks per seed).
 
+**Long songs (2026-11-16, 200 s fixed-score cover).** The recipe holds at 3.33 minutes: normal
+render 604 track-0 sung notes, `4bit-fast --instrumental` 12 (one 12 s hum at 120–132 s),
+`4bit-tiny --instrumental` 0, all `rc=0` / 200.0 s / 0 non-finite / 0 clipped / no long silence.
+But the 4-note tolerance is a **whole-track** count, so that one hum exceeds it and the default
+2 retries re-render the entire song with `seed + 1` (~6 min per attempt on `4bit-fast`, ~9–11 min
+on `4bit-tiny`). A 3-seed control gave `4bit-fast` 12/0/0 and `4bit-tiny` 0/0/0: statistically
+indistinguishable (one-sided Fisher p = 0.5), so do **not** conclude that tiny is better at
+instrumental — the first retry seed already fixes fast. For long songs prefer
+`--instrumental-retries 0` plus an independent `transcribe --profile 16bit-fast` check of the
+saved WAV, or a per-window threshold in a caller. CFG 1.5 roughly doubles AR time (+61 % on fast)
+and pushes `4bit-tiny` to ~5 GB, above its 3072 MB threshold. The upstream skill states
+`absence_of_vocals_checked=False`: the note count is a proxy, always audition. Details and UI
+implications: [API.md](API.md#app-and-ui-integration-measured-constraints).
+
 ## `encode`, `remix-experimental`
 
 ```bash

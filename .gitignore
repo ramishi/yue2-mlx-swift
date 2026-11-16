@@ -17,3 +17,10 @@ Apps/YuE2Mobile/Signing.xcconfig
 .local-runs/signing.yml
 .venv-sheetsage2/
 .venv-karaoke/
+
+# Machine-local working data — deliberately absent from the clean engine base
+.workbuddy/
+.vscode/
+run/
+Scripts/bench-m5-*.sh
+Scripts/bench-transcribe-local.sh

@@ -27,6 +27,7 @@ Transcription dans le dépôt de la mémoire persistante de l'agent (Claude Code
 
 ## Pièges durables
 
+- **Avant toute UI de génération**, lire `docs/API.md` § « App and UI integration: measured constraints » (2026-11-16) et l'entrée du 2026-11-16 dans `log.md` : les profils ne sont pas une échelle de qualité, `--instrumental` n'est pas une garantie d'absence de voix (ni un modèle/LoRA), le seuil de 4 notes chantées porte sur toute la piste et fait re-rendre un long morceau entier, et une comparaison de packs exige le cover à partition fixe sans score de qualité. Sur M5 / 32 Go, garder `4bit-fast`.
 - Swift 6 isolation par défaut : un fournisseur `UIColor { traits in … }` hérite de MainActor et piège sur l'appareil seulement (jamais au simulateur) ; `nonisolated` + `@Sendable`. Logs de crash iPhone : `xcrun devicectl … --domain-type systemCrashLogs`.
 - `#expect(…, "\(x)")` : le commentaire doit être une chaîne. Swift 6.2 « failed to produce diagnostic » sur une application partielle : écrire la closure.
 - Transcription de contrôle : Voxtral (`convertvoxtral`) lit son modèle sur le disque externe Lexar (le dossier `mzbac` du cache de modèles est un lien vers lui) ; disque non monté → « The file "models" couldn't be saved ». Repli : Whisper medium libre (`.venv-karaoke`, poids `medium.pt` du cache Whisper, 17 s par chanson sur le CPU, `condition_on_previous_text=False`), qui redonne les lectures Voxtral.

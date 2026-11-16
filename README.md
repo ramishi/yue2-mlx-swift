@@ -4,6 +4,8 @@
 
 Swift / MLX port of **YuE2** (m-a-p, September 2026) for Apple Silicon: lyrics and style → editable ABC score → semantic tokens → acoustic latents by flow matching → 48 kHz stereo song. The whole pipeline runs locally on a Mac or an iPhone 15 Pro Max, with no Python at inference time.
 
+> **This is the `ramishi` fork**, a clean engine base for a separate macOS app: three WAV/VAE fixes are carried on `fork/main` and proposed upstream as [PR #6](https://github.com/VincentGourbin/yue2-mlx-swift/pull/6). See [FORK.md](FORK.md) for branch topology, upstream sync, version pinning and DMG notes.
+
 ## PocketAnthem, on the App Store
 
 [**PocketAnthem**](https://apps.apple.com/us/app/pocketanthem/id6815755463) is the iPhone app built on this engine: write lyrics, pick a style, and the song is generated **entirely on the phone** — no server, no upload, the 3-billion-parameter YuE2 model running through MLX on the A17 Pro with the `4bit-lean` configuration described below. Everything measured in this repository (stage-scoped residency, per-step checkpoints, the GPU gate, the published 4-bit pack) exists because that app had to fit in 8 GB and survive a trip to Safari mid-song. More on [vinceforge.com](https://vinceforge.com).
@@ -18,6 +20,8 @@ Listed in [awesome-YuE](https://github.com/RevolutionLA/awesome-YuE), the curate
 | [Benchmarks: method, results, reproduction](docs/Benchmarks.md) | protocol, Mac and iPhone tables, Core AI, how to contribute |
 | [Command line](docs/CLI.md) | every `yue2` command and option |
 | [Swift API](docs/API.md) | `ModelSession`, `YuE2Pipeline`, residency, checkpoints, GPU gate, VAE backends, `SheetSage2Core` transcription |
+| [Fork & macOS app base](FORK.md) | branch topology, upstream sync, version pinning, one-bundle DMG constraints |
+| [App / UI integration constraints](docs/API.md#app-and-ui-integration-measured-constraints) | read before building a generation UI: profiles are not quality tiers, instrumental is not a guarantee, retry/ETA/artifact rules |
 | [iPhone](docs/iOS.md) | integration, losing the GPU in the background, on-device measurements |
 | [Weights and packs](docs/Weights.md) | download, the published prequantized packs, licence |
 | [Engineering knowledge base](docs/knowledge/index.md) | measurement log, decisions and verified pitfalls (OKF, in French, readable by humans and agents) |

@@ -20,6 +20,8 @@ Choix d'architecture motivés (pourquoi telle voie, tel dtype, tel cache).
 - [Six configurations de référence](decisions/reference-profiles.md) — 4/8/16 bits × rapide/économe, temps et pics sur 70 s, choix motivés, points ouverts.
 - [Entrée audio par les entrées natives du modèle](decisions/audio-input-via-model-entries.md) — mélodie fredonnée → ABC imposé, variation SDEdit, régénération avec masque ; mesures et pièges (YIN, longueur de l'AR).
 - [Résidence des poids par étape (iPhone)](decisions/stage-scoped-weight-residency.md) — le budget mémoire compte le max des étapes, pas leur somme ; implémentation MLX pure.
+- [Contraintes pour une UI de génération (2026-11-16)](../API.md#app-and-ui-integration-measured-constraints) — note publique en anglais, à lire **avant** toute interface : profils ≠ qualité, instrumental ≠ garantie, relance et seuil sur piste entière, comparaison par cover, ETA et artefacts. Journal détaillé : `log.md` à la date du 2026-11-16.
+- [Base moteur propre du fork (2026-11-16)](../../FORK.md) — `main` miroir amont, `fork/main` branche par défaut, PR #6 gelée, procédure de rebase quand l'amont fusionne, pin par SHA depuis le dépôt de l'app macOS, contraintes du bundle DMG unique.
 
 ## Pitfalls
 Pièges rencontrés et leur correctif, numérotés comme ceux de PLAN.md §9.
