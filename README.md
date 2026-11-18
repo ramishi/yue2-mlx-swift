@@ -16,6 +16,7 @@ Listed in [awesome-YuE](https://github.com/RevolutionLA/awesome-YuE), the curate
 
 | Documentation | |
 |---|---|
+| [UI designer handoff](docs/DESIGNER-UI-HANDOFF.md) | where designers should start: engine capability map, version pin, and links to the private product specs |
 | [The reference configurations](docs/References.md) | which pack, which settings, for which machine |
 | [Benchmarks: method, results, reproduction](docs/Benchmarks.md) | protocol, Mac and iPhone tables, Core AI, how to contribute |
 | [Command line](docs/CLI.md) | every `yue2` command and option |
